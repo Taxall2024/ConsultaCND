@@ -19,7 +19,7 @@ control = dbController(caminho)
 # URL e argumentos da requisição
 url = 'https://api.infosimples.com/api/v2/consultas/receita-federal/pgfn'
 args = {
-    "token": "yeS4ShEES9X8ggfc8Z2ATY0zLjjpeTbtKwXdVORR",
+    "token": "",
     "preferencia_emissao": "nova",  # Inicialmente configurado como nova
     "timeout": 300
 }
