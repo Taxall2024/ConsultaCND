@@ -77,45 +77,51 @@ def filtrar_cnpjs_validos(cnpjs):
     return [cnpj for cnpj in cnpjs if len(cnpj) == 14 and cnpj.isdigit()]
 
 
-def ler_planilhas_e_extrair_cnpjs(arquivo_excel, sheet1_header, sheet2_header):
+def ler_planilhas_e_extrair_cnpjs(arquivo_excel: str, sheet1_header: int = 2, sheet2_header: int = 1) -> pd.DataFrame:
     """
-    Lê as planilhas de um arquivo Excel, ajusta os cabeçalhos e extrai os CNPJs.
+    Processa as planilhas de um arquivo Excel para extrair as colunas 'CNPJ' e 'Empresa'.
     
-    Parâmetros:
-        arquivo_excel (str): Nome do arquivo Excel.
-        sheet1_header (int): Linha do cabeçalho da primeira planilha (zero-based).
-        sheet2_header (int): Linha do cabeçalho da segunda planilha (zero-based).
+    Args:
+        arquivo_excel (str): Caminho do arquivo Excel a ser processado.
+        sheet1_header (int): Número da linha que contém o cabeçalho da primeira aba.
+        sheet2_header (int): Número da linha que contém o cabeçalho da segunda aba.
     
-    Retorno:
-        lista_cnpjs (list): Lista combinada de CNPJs das duas planilhas.
+    Returns:
+        pd.DataFrame: DataFrame consolidado e limpo contendo as colunas 'CNPJ' e 'Empresa'.
     """
     try:
-        # Leia as planilhas forçando a leitura da coluna 'CNPJ' como texto
-        planilha1 = pd.read_excel(arquivo_excel, sheet_name=0, header=sheet1_header, dtype={'CNPJ': str})
-        planilha2 = pd.read_excel(arquivo_excel, sheet_name=1, header=sheet2_header, dtype={'CNPJ': str})
+        # Ler as abas do Excel
+        df_aba1 = pd.read_excel(arquivo_excel, sheet_name=0, header=sheet1_header)  # Primeira aba
+        df_aba2 = pd.read_excel(arquivo_excel, sheet_name=1, header=sheet2_header)  # Segunda aba
+
+        # Verificar e ajustar as colunas
+        colunas_aba1 = df_aba1.columns.str.strip()
+        colunas_aba2 = df_aba2.columns.str.strip()
+
+        if 'CNPJ' not in colunas_aba1 or ('Empresa' not in colunas_aba1 and 'EMPRESA' not in colunas_aba1):
+            raise KeyError("Colunas 'CNPJ' ou 'Empresa'/'EMPRESA' não encontradas na primeira aba.")
+        if 'CNPJ' not in colunas_aba2 or ('Empresa' not in colunas_aba2 and 'EMPRESA' not in colunas_aba2):
+            raise KeyError("Colunas 'CNPJ' ou 'Empresa'/'EMPRESA' não encontradas na segunda aba.")
         
-        # Remova espaços desnecessários nos nomes das colunas
-        planilha1.columns = planilha1.columns.str.strip()
-        planilha2.columns = planilha2.columns.str.strip()
+        # Selecionar as colunas relevantes
+        df_aba1 = df_aba1[['CNPJ', 'Empresa' if 'Empresa' in colunas_aba1 else 'EMPRESA']]
+        df_aba2 = df_aba2[['CNPJ', 'Empresa' if 'Empresa' in colunas_aba2 else 'EMPRESA']]
 
-        # Verifique se a coluna 'CNPJ' está presente
-        if 'CNPJ' not in planilha1.columns or 'CNPJ' not in planilha2.columns:
-            print("Coluna 'CNPJ' não encontrada em uma das planilhas. Verifique a estrutura do arquivo.")
-            return []
+        # Limpar os valores de CNPJ e garantir que sejam strings de 14 dígitos
+        df_aba1['CNPJ'] = df_aba1['CNPJ'].dropna().apply(lambda x: str(x).split('.')[0].zfill(14))
+        df_aba2['CNPJ'] = df_aba2['CNPJ'].dropna().apply(lambda x: str(x).split('.')[0].zfill(14))
 
-        # Extraia os CNPJs da primeira planilha
-        cnpj_planilha1 = planilha1['CNPJ'].dropna().apply(lambda x: str(x).split('.')[0]).tolist()
+        # Remover linhas com valores ausentes
+        df_aba1 = df_aba1.dropna(subset=['CNPJ', 'EMPRESA']).reset_index(drop=True)
+        df_aba2 = df_aba2.dropna(subset=['CNPJ', 'EMPRESA']).reset_index(drop=True)
 
-        # Extraia os CNPJs da segunda planilha, filtrando dados inválidos
-        cnpj_planilha2 = planilha2['CNPJ'].dropna().apply(lambda x: str(x).split('.')[0]).tolist()
+        # Concatenar as duas abas
+        df_empresas = pd.concat([df_aba1, df_aba2], ignore_index=True)
 
-        # Filtrar apenas CNPJs válidos
-        cnpj_planilha1 = filtrar_cnpjs_validos(cnpj_planilha1)
-        cnpj_planilha2 = filtrar_cnpjs_validos(cnpj_planilha2)
+        # Limpar e padronizar os nomes das colunas
+        df_empresas.columns = df_empresas.columns.str.strip()
 
-        # Combine os CNPJs de ambas as planilhas
-        lista_cnpjs = cnpj_planilha1 + cnpj_planilha2
-        return lista_cnpjs
+        return df_empresas
 
     except Exception as e:
         print(f"Erro ao processar o arquivo Excel: {e}")
@@ -133,8 +139,8 @@ except FileNotFoundError as e:
     exit()
 
 # Ler e extrair CNPJs
-lista_cnpjs = ler_planilhas_e_extrair_cnpjs(arquivo_excel, sheet1_header=2, sheet2_header=1)
-
+lista_cnpjs = ler_planilhas_e_extrair_cnpjs(arquivo_excel)
+print(lista_cnpjs)
 # Exiba o resultado
 # if lista_cnpjs:
 #     print("Lista de CNPJs:", lista_cnpjs)
